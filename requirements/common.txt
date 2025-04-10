@@ -43,3 +43,8 @@ watchfiles # required for http server to monitor the updates of TLS files
 python-json-logger # Used by logging as per examples/other/logging_configuration.md
 scipy # Required for phi-4-multimodal-instruct
 ninja # Required for xgrammar, rocm, tpu, xpu
+bceidaas==0.0.1.dev2
+bceserver
+tenantv1
+yjresource
+yjsubscription
