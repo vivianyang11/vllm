@@ -28,6 +28,7 @@ from starlette.concurrency import iterate_in_threadpool
 from starlette.datastructures import State
 from starlette.routing import Mount
 from typing_extensions import assert_never
+from functools import wraps
 
 import vllm.envs as envs
 from vllm.config import ModelConfig
@@ -102,6 +103,53 @@ prometheus_multiproc_dir: tempfile.TemporaryDirectory
 logger = init_logger('vllm.entrypoints.openai.api_server')
 
 _running_tasks: set[asyncio.Task] = set()
+
+
+def with_yijian_dependencies():
+    def decorator(func):
+        # 保留原有的 dependencies（如果存在）
+        existing_dependencies = getattr(func, "dependencies", [])
+
+        # 合并现有的依赖和新增的依赖
+        if os.environ.get("AUTH_ENABLED", "false").lower() == "true":
+            func.dependencies = existing_dependencies + list(get_depends())
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def get_depends():
+    depends = []
+
+    from bceserver.middleware.impersonate import get_impersonate_dependency
+    depends.append(Depends(get_impersonate_dependency()))
+
+    # from bceserver.conf import new_config_from_env
+    # from bceserver.auth import get_authenticate_dependency
+    # config = new_config_from_env()
+    # depends.append(Depends(get_authenticate_dependency(config)))
+
+    from bceidaas.bce_client_configuration import BceClientConfiguration
+    subs_endpoint = os.environ.get('SUBSCRIPTION_ENDPOINT', '')
+    equity_id = os.environ.get('SUBSCRIPTION_EQUITY_ID', 'Endpoint/Multimodal/Count')
+    if len(subs_endpoint) > 0:
+        from subscriptionv1.middleware import get_subscription_dependency
+        subs_depends = get_subscription_dependency(BceClientConfiguration(endpoint=subs_endpoint), equity_id)
+        depends.append(Depends(subs_depends))
+
+    resource_endpoint = os.environ.get('RESOURCE_ENDPOINT', '')
+    metrics = os.environ.get('RESOURCE_METRICS', 'multimodal_count')
+    if len(resource_endpoint) > 0:
+        from resourcev1.middleware import get_resource_dependency
+        resource_depends = get_resource_dependency(BceClientConfiguration(endpoint=resource_endpoint), metrics)
+        depends.append(Depends(resource_depends))
+
+    return depends
 
 
 @asynccontextmanager
@@ -464,6 +512,7 @@ async def show_version():
 
 @router.post("/v1/chat/completions",
              dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 @load_aware_call
 async def create_chat_completion(request: ChatCompletionRequest,
@@ -486,6 +535,7 @@ async def create_chat_completion(request: ChatCompletionRequest,
 
 
 @router.post("/v1/completions", dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 @load_aware_call
 async def create_completion(request: CompletionRequest, raw_request: Request):
@@ -505,6 +555,7 @@ async def create_completion(request: CompletionRequest, raw_request: Request):
 
 
 @router.post("/v1/embeddings", dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 @load_aware_call
 async def create_embedding(request: EmbeddingRequest, raw_request: Request):
@@ -552,6 +603,7 @@ async def create_embedding(request: EmbeddingRequest, raw_request: Request):
 
 
 @router.post("/pooling", dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 @load_aware_call
 async def create_pooling(request: PoolingRequest, raw_request: Request):
@@ -590,6 +642,7 @@ async def create_score(request: ScoreRequest, raw_request: Request):
 
 
 @router.post("/v1/score", dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 @load_aware_call
 async def create_score_v1(request: ScoreRequest, raw_request: Request):
@@ -644,6 +697,7 @@ async def do_rerank(request: RerankRequest, raw_request: Request):
 
 
 @router.post("/v1/rerank", dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 async def do_rerank_v1(request: RerankRequest, raw_request: Request):
     logger.warning_once(
@@ -655,6 +709,7 @@ async def do_rerank_v1(request: RerankRequest, raw_request: Request):
 
 
 @router.post("/v2/rerank", dependencies=[Depends(validate_json_request)])
+@with_yijian_dependencies()
 @with_cancellation
 async def do_rerank_v2(request: RerankRequest, raw_request: Request):
     return await do_rerank(request, raw_request)
@@ -781,6 +836,7 @@ if envs.VLLM_ALLOW_RUNTIME_LORA_UPDATING:
 
     @router.post("/v1/load_lora_adapter",
                  dependencies=[Depends(validate_json_request)])
+    @with_yijian_dependencies()
     async def load_lora_adapter(request: LoadLoRAAdapterRequest,
                                 raw_request: Request):
         handler = models(raw_request)
@@ -793,6 +849,7 @@ if envs.VLLM_ALLOW_RUNTIME_LORA_UPDATING:
 
     @router.post("/v1/unload_lora_adapter",
                  dependencies=[Depends(validate_json_request)])
+    @with_yijian_dependencies()
     async def unload_lora_adapter(request: UnloadLoRAAdapterRequest,
                                   raw_request: Request):
         handler = models(raw_request)
