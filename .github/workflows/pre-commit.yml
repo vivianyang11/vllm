@@ -63,7 +63,7 @@ jobs:
           echo "asset_name=${asset_name}" >> "$GITHUB_ENV"
 
       - name: Upload Wheel to Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.2.1
         with:
           name: wheel
           path: dist/*.whl
