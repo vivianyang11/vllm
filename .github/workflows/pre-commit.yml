@@ -21,7 +21,7 @@ jobs:
         os: ['ubuntu-20.04']
         python-version: ['3.9', '3.10', '3.11', '3.12']
         pytorch-version: ['2.4.0']
-        cuda-version: ['11.8', '12.1']
+        cuda-version: ['11.8']
 
     steps:
       - name: Checkout Repository
@@ -63,7 +63,7 @@ jobs:
           echo "asset_name=${asset_name}" >> "$GITHUB_ENV"
 
       - name: Upload Wheel to Artifacts
-        uses: actions/upload-artifact@v3.1.0
+        uses: actions/upload-artifact@v3
         with:
           name: wheel
           path: dist/*.whl
