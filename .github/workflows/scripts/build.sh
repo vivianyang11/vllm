@@ -25,6 +25,10 @@ export NINJA_NUM_CORES=1
 export TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0+PTX"
 export VLLM_FA_CMAKE_GPU_ARCHES="80-real;90-real"
 
+(sleep 300 && while true; do echo "[still building... 🚧]"; sleep 60; done) &
+watchdog_pid=$!
+trap "kill $watchdog_pid" EXIT
+
 bash tools/check_repo.sh
 
 # ✅ 建议显示输出当前内存状态，便于调试
