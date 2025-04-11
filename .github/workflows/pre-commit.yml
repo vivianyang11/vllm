@@ -29,22 +29,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Clean up disk to prevent OOM/ENOSPC
-        run: |
-          echo "Before cleanup:"
-          df -h /
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-          sudo docker system prune -af || true
-          echo "After cleanup:"
-          df -h /
-
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.14
         with:
           create-symlink: true
           key: ${{ github.job }}-${{ matrix.python-version }}-${{ matrix.cuda-version }}
-          max-size: 2G
 
       - name: Set up Linux Environment
         if: ${{ runner.os == 'Linux' }}
@@ -68,13 +57,8 @@ jobs:
         shell: bash
         env:
           CMAKE_BUILD_TYPE: Release
-          TMPDIR: /tmp
         run: |
-          echo "Free space before build:"
-          df -h /
           bash -x .github/workflows/scripts/build.sh ${{ matrix.python-version }} ${{ matrix.cuda-version }}
-          echo "Free space after build:"
-          df -h /
           wheel_name=$(find dist -name "*whl" -print0 | xargs -0 -n 1 basename)
           asset_name=${wheel_name//"linux"/"manylinux1"}
           echo "wheel_name=${wheel_name}" >> "$GITHUB_ENV"
